@@ -1,0 +1,3 @@
+# 本地联调 bmsrs 时，把本文件复制为 .cargo/config.toml（不提交）。
+[patch."https://github.com/brightmeows/bmsrs"]
+bmsrs = { path = "../bmsrs" }
