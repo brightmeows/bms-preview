@@ -125,6 +125,7 @@ impl LoadWorker {
 
                 progress("解码 BGA 图片...");
                 let (bga, bga_warnings) = decode_bga_images(&chart.bga_resources, &chart.base_dir);
+                bevy::log::info!("BGA 图片解码完成: {} 张", bga.iter().flatten().count());
                 chart.warnings.extend(bga_warnings);
 
                 progress("解码音频...");
@@ -207,6 +208,12 @@ pub fn startup(
     playback.offset_ms = startup.offset_ms;
     playback.muted = startup.muted;
     playback.audio_available = audio.clock_seconds().is_some();
+    bevy::log::info!(
+        "音频后端: sample_rate={} clock={:?} error={:?}",
+        audio.sample_rate(),
+        audio.clock_seconds(),
+        audio.error()
+    );
     audio.set_volume(playback.effective_volume());
     audio.set_speed(playback.speed);
 

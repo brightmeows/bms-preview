@@ -324,6 +324,7 @@ fn run_worker(
     };
     let mut generation = initial_generation;
     let mut last_pts: f64 = 0.0;
+    let mut logged_first_frame = false;
 
     loop {
         while let Ok(command) = commands.try_recv() {
@@ -355,6 +356,10 @@ fn run_worker(
                 let pts = timestamp.as_secs_f64();
                 last_pts = last_pts.max(pts);
                 let (height, width, channels) = frame.dim();
+                if !logged_first_frame {
+                    logged_first_frame = true;
+                    bevy::log::info!("视频首帧: {width}x{height} pts={pts:.3}");
+                }
                 if channels < 3 || width == 0 || height == 0 {
                     continue;
                 }
