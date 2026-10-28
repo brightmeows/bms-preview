@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "song_info": {
+    "title": "Minimal BMSON",
+    "artist": "bms-preview",
+    "genre": "Test"
+  },
+  "chart_info": {
+    "subtitle": "",
+    "subartists": [],
+    "chart_name": "TEST",
+    "level": 1,
+    "bga": {
+      "bga_header": [],
+      "bga_events": [],
+      "layer_events": [],
+      "poor_events": []
+    }
+  },
+  "chart_data": {
+    "mode_hint": "beat-7k",
+    "init_bpm": 120.0,
+    "resolution": 240,
+    "lines": [],
+    "bpm_events": [],
+    "stop_events": [],
+    "sound_channels": [
+      {
+        "name": "kick.wav",
+        "note_events": [
+          { "x": 1, "y": 0, "l": 0, "c": false }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+#PLAYER 1
+#TITLE Random Fixture
+#ARTIST bms-preview
+#BPM 120
+#WAV01 kick.wav
+#RANDOM 2
+#IF 1
+#00111:01
+#ELSE
+#00112:01
+#ENDIF
+#ENDRANDOM
