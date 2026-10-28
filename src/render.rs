@@ -1,8 +1,8 @@
 //! 轨道、音符、小节线与静态场景。
 
 use crate::layout::{
-    JUDGMENT_LINE_Y, LOOKAHEAD_MS, PIXELS_PER_BEAT, REACTION_MS, VIEW_HEIGHT, judgment_world_y,
-    world_x, world_y,
+    JUDGMENT_LINE_Y, LOOKAHEAD_MS, PIXELS_PER_BEAT, REACTION_MS, VIEW_HEIGHT, VIEW_WIDTH,
+    judgment_world_y, world_x, world_y,
 };
 use crate::state::Session;
 use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
@@ -63,8 +63,9 @@ pub fn setup_scene(commands: &mut Commands) {
     commands.spawn((
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
-            scaling_mode: ScalingMode::FixedVertical {
-                viewport_height: VIEW_HEIGHT,
+            scaling_mode: ScalingMode::AutoMin {
+                min_width: VIEW_WIDTH,
+                min_height: VIEW_HEIGHT,
             },
             ..OrthographicProjection::default_2d()
         }),
