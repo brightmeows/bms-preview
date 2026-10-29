@@ -745,25 +745,23 @@ fn replay_bgm(audio: &mut AudioBackend, player: &Player<(), PreviewEvent>, targe
         let EventKind::Bgm { audio_index } = &event.kind else {
             continue;
         };
+        let audio_index = audio_index.get();
         let event_time = player.tick_to_duration(event.tick());
-        let Some(sample_duration) = audio.sample_duration(*audio_index) else {
+        let Some(sample_duration) = audio.sample_duration(audio_index) else {
             continue;
         };
         let event_end = event_time.as_secs_f64() + sample_duration;
         if event_end > target.as_secs_f64() && target >= event_time {
             let offset = target.as_secs_f64() - event_time.as_secs_f64();
-            let _ = audio.play(*audio_index, offset, false);
+            let _ = audio.play(audio_index, offset, false);
         }
     }
 }
 
-const fn audio_index(kind: &EventKind<(), PreviewEvent>) -> Option<u32> {
+fn audio_index(kind: &EventKind<(), PreviewEvent>) -> Option<u32> {
     match kind {
-        EventKind::Note {
-            audio_index: Some(index),
-            ..
-        } => Some(*index),
-        EventKind::Bgm { audio_index } => Some(*audio_index),
+        EventKind::Note { audio, .. } => audio.primary().map(bmsrs::chart::AudioIndex::get),
+        EventKind::Bgm { audio_index } => Some(audio_index.get()),
         _ => None,
     }
 }

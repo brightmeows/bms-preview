@@ -1765,7 +1765,7 @@ dependencies = [
 [[package]]
 name = "bms-analysis"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-syntax",
  "bms-values",
@@ -1774,12 +1774,11 @@ dependencies = [
 [[package]]
 name = "bms-parser"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-source",
  "bms-syntax",
  "bms-values",
- "bmsrs-chart",
  "thiserror 2.0.21",
 ]
 
@@ -1804,7 +1803,7 @@ dependencies = [
 [[package]]
 name = "bms-processor"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-parser",
  "bmsrs-chart",
@@ -1814,7 +1813,7 @@ dependencies = [
 [[package]]
 name = "bms-source"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "encoding_rs",
  "thiserror 2.0.21",
@@ -1823,7 +1822,7 @@ dependencies = [
 [[package]]
 name = "bms-syntax"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-source",
  "rowan",
@@ -1833,7 +1832,7 @@ dependencies = [
 [[package]]
 name = "bms-values"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-values-derive",
  "derive_more",
@@ -1843,7 +1842,7 @@ dependencies = [
 [[package]]
 name = "bms-values-derive"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1853,7 +1852,7 @@ dependencies = [
 [[package]]
 name = "bms-writer"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-parser",
 ]
@@ -1861,7 +1860,7 @@ dependencies = [
 [[package]]
 name = "bmson-def"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "derive_more",
  "serde",
@@ -1872,7 +1871,7 @@ dependencies = [
 [[package]]
 name = "bmson-processor"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bmson-def",
  "bmsrs-chart",
@@ -1882,7 +1881,7 @@ dependencies = [
 [[package]]
 name = "bmsrs"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bms-analysis",
  "bms-parser",
@@ -1901,12 +1900,12 @@ dependencies = [
 [[package]]
 name = "bmsrs-chart"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 
 [[package]]
 name = "bmsrs-player"
 version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=bdb167e755182626fee1eb059a6de92592fd4808#bdb167e755182626fee1eb059a6de92592fd4808"
+source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
 dependencies = [
  "bmsrs-chart",
 ]
