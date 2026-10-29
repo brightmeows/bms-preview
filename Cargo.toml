@@ -20,7 +20,7 @@ path = "src/main.rs"
 [workspace]
 
 [dependencies]
-bmsrs = { git = "https://github.com/brightmeows/bmsrs", rev = "bdb167e755182626fee1eb059a6de92592fd4808" }
+bmsrs = { git = "https://github.com/brightmeows/bmsrs", rev = "da1d9f46b84955312ea42bb291b0edddab29e3df" }
 bevy = { version = "0.20.0", default-features = false, features = [
     "bevy_asset",
     "bevy_camera",

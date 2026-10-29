@@ -369,7 +369,9 @@ fn process_bms<L: BmsLayout>(
     ),
     LoadError,
 > {
-    BmsProcessor::process_with_warnings::<L>(bms).map_err(|e| LoadError::BmsProcess(e.to_string()))
+    BmsProcessor::process::<L>(bms)
+        .map(|processed| (processed.chart, processed.warnings))
+        .map_err(|e| LoadError::BmsProcess(e.to_string()))
 }
 
 fn map_bms_chart(
@@ -448,9 +450,9 @@ fn load_bmson(path: &Path) -> Result<(Chart<(), PreviewEvent>, ModeKind, Vec<Str
         }
     };
 
-    let chart = BmsonProcessor::process_default(&bmson)
+    let processed = BmsonProcessor::process_default(&bmson)
         .map_err(|e| LoadError::BmsonProcess(e.to_string()))?;
-    let chart: Chart<(), PreviewEvent> = chart.filter_map_events(|event| {
+    let chart: Chart<(), PreviewEvent> = processed.chart.filter_map_events(|event| {
         let tick = event.tick();
         let kind: EventKind<(), PreviewEvent> = event
             .kind

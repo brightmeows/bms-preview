@@ -129,7 +129,9 @@ impl BgaState {
 
     fn apply_chart_event(&mut self, kind: &EventKind<(), PreviewEvent>) {
         match kind {
-            EventKind::Bga { layer, resource_id } => self.apply_event(*layer, *resource_id),
+            EventKind::Bga { layer, resource_id } => {
+                self.apply_event(*layer, resource_id.get());
+            }
             EventKind::Custom(PreviewEvent::BgaOpacity { layer, opacity }) => {
                 self.apply_opacity(*layer, *opacity);
             }
@@ -302,7 +304,6 @@ mod tests {
     fn decodes_png_fixture() {
         let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let resource = BgaResource {
-            id: 1,
             path: PathBuf::from("bga.png"),
             crop: None,
         };
