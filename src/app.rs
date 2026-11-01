@@ -25,6 +25,7 @@ use crate::render::{ChartEntity, despawn_chart, setup_scene, spawn_chart};
 use crate::state::{Phase, Playback, SampleRate, Session, StartupOptions, UiState};
 use crate::ui::{Fonts, spawn_hud};
 use crate::video::VideoState;
+use crate::viewport::ViewportRes;
 
 /// 加载 worker 消息。
 enum LoadMessage {
@@ -191,12 +192,13 @@ pub fn startup(
     mut picker: ResMut<Picker>,
     startup: Res<StartupOptions>,
     sample_rate: Res<SampleRate>,
+    viewport: Res<ViewportRes>,
     mut audio: NonSendMut<AudioBackend>,
 ) {
     setup_scene(&mut commands);
     let font = load_ui_font(&mut fonts_assets);
     let fonts = Fonts { ui: font };
-    spawn_hud(&mut commands, &fonts);
+    spawn_hud(&mut commands, &fonts, *viewport);
     commands.insert_resource(fonts);
     let bga_sprites = crate::bga::spawn_sprites(&mut commands);
     commands.insert_resource(bga_sprites);
@@ -250,6 +252,7 @@ pub fn input_system(
     mut picker: ResMut<Picker>,
     mut worker: ResMut<LoadWorker>,
     sample_rate: Res<SampleRate>,
+    viewport: Res<ViewportRes>,
     mut audio: NonSendMut<AudioBackend>,
     mut drag: MessageReader<FileDragAndDrop>,
     mut exit: MessageWriter<AppExit>,
@@ -485,9 +488,10 @@ pub fn input_system(
         && session.loaded.is_some()
         && let Ok(window) = windows.single()
         && let Some(cursor) = window.cursor_position()
-        && cursor.y > window.height() - 24.0
+        && let screen = crate::viewport::cursor_to_screen(cursor, window, *viewport)
+        && screen.y > viewport.height - 24.0
     {
-        let fraction = f64::from((cursor.x / window.width()).clamp(0.0, 1.0));
+        let fraction = f64::from((screen.x / viewport.width).clamp(0.0, 1.0));
         let target = duration.mul_f64(fraction);
         playback.request_seek(target);
         audio.stop_all();
@@ -512,6 +516,7 @@ pub fn worker_system(
     fonts: Res<Fonts>,
     chart_entities: Query<Entity, With<ChartEntity>>,
     sample_rate: Res<SampleRate>,
+    viewport: Res<ViewportRes>,
 ) {
     if let Some(result) = picker.poll() {
         match result {
@@ -559,6 +564,7 @@ pub fn worker_system(
                     &mut *images,
                     &*fonts,
                     &chart_entities,
+                    *viewport,
                     *result,
                 );
             }
@@ -580,6 +586,7 @@ fn apply_load(
     images: &mut Assets<Image>,
     fonts: &Fonts,
     chart_entities: &Query<Entity, With<ChartEntity>>,
+    viewport: ViewportRes,
     result: LoadResult,
 ) {
     let LoadResult {
@@ -619,7 +626,7 @@ fn apply_load(
     session.video = video;
 
     despawn_chart(commands, chart_entities);
-    spawn_chart(commands, session, fonts);
+    spawn_chart(commands, session, fonts, viewport);
 
     let clock = audio
         .clock_seconds()

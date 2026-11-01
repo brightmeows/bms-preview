@@ -4,16 +4,18 @@ use bmsrs::chart::{Chart, Lane, NoteSide};
 
 use crate::chart::{PreviewEvent, note_position};
 
-/// 虚拟画布宽度。
-pub const VIEW_WIDTH: f32 = 800.0;
-/// 虚拟画布高度。
-pub const VIEW_HEIGHT: f32 = 600.0;
+/// 基准带宽度：逻辑内容区的布局基准；视口最小保证此宽度，宽窗口下居中扩展。
+pub const BASIS_WIDTH: f32 = 800.0;
+/// 基准带高度：逻辑内容区的布局基准；视口最小保证此高度，窄窗口下居中扩展。
+pub const BASIS_HEIGHT: f32 = 600.0;
 /// 轨道间距。
 pub const TRACK_SPACING: f32 = 4.0;
 /// 单条轨道最大宽度。
 pub const MAX_TRACK_WIDTH: f32 = 55.0;
-/// 判定线纵坐标（屏幕坐标，顶部为 0）。
+/// 判定线在基准带内的纵坐标（顶部为 0）。
 pub const JUDGMENT_LINE_Y: f32 = 500.0;
+/// 判定线的世界 Y 坐标：固定于视口中心下方，窄窗口扩展时视觉焦点不动。
+pub const JUDGMENT_WORLD_Y: f32 = BASIS_HEIGHT / 2.0 - JUDGMENT_LINE_Y;
 /// 每拍像素数。
 pub const PIXELS_PER_BEAT: f32 = 120.0;
 /// 判定线下方可见历史时长。
@@ -30,7 +32,7 @@ pub struct Track {
     pub lane: Lane,
     /// 显示标签。
     pub label: String,
-    /// 左边界（虚拟画布坐标）。
+    /// 基准带内左边界。
     pub x: f32,
     /// 宽度。
     pub width: f32,
@@ -63,7 +65,7 @@ impl TrackLayout {
     pub fn center_x(&self, index: usize) -> f32 {
         self.tracks
             .get(index)
-            .map_or(VIEW_WIDTH / 2.0, |track| track.x + track.width / 2.0)
+            .map_or(BASIS_WIDTH / 2.0, |track| track.x + track.width / 2.0)
     }
 
     /// 轨道宽度。
@@ -78,7 +80,7 @@ impl TrackLayout {
     #[must_use]
     pub fn bounds(&self) -> (f32, f32) {
         let Some(first) = self.tracks.first() else {
-            return (0.0, VIEW_WIDTH);
+            return (0.0, BASIS_WIDTH);
         };
         let last = self
             .tracks
@@ -115,12 +117,12 @@ pub fn infer_layout(chart: &Chart<(), PreviewEvent>) -> TrackLayout {
     }
 
     let spacing = TRACK_SPACING;
-    let available = VIEW_WIDTH - 40.0;
+    let available = BASIS_WIDTH - 40.0;
     let width = ((available - spacing * (count.saturating_sub(1)) as f32) / count as f32)
         .min(MAX_TRACK_WIDTH)
         .max(12.0);
     let total = width.mul_add(count as f32, spacing * (count.saturating_sub(1)) as f32);
-    let start = (VIEW_WIDTH - total) / 2.0;
+    let start = (BASIS_WIDTH - total) / 2.0;
 
     let tracks = positions
         .into_iter()
@@ -185,25 +187,6 @@ fn track_label(side: NoteSide, lane: Lane) -> String {
         base
     }
 }
-
-/// 判定线上方的 world Y 坐标（Bevy 使用 Y 向上）。
-#[must_use]
-pub fn judgment_world_y() -> f32 {
-    VIEW_HEIGHT / 2.0 - JUDGMENT_LINE_Y
-}
-
-/// 屏幕坐标转 world 坐标。
-#[must_use]
-pub fn world_x(x: f32) -> f32 {
-    x - VIEW_WIDTH / 2.0
-}
-
-/// 屏幕坐标转 world 坐标。
-#[must_use]
-pub fn world_y(y: f32) -> f32 {
-    VIEW_HEIGHT / 2.0 - y
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

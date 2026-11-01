@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use bevy::asset::Handle;
+use bevy::ecs::change_detection::DetectChanges as _;
 use bevy::prelude::{
     Color, Commands, Component, FontSize, Query, Res, Resource, Text2d, TextColor, TextFont,
     TextLayout, Time, Transform, Visibility,
@@ -11,14 +12,45 @@ use bevy::sprite::Anchor;
 use bevy::text::{Font, Justify};
 
 use crate::config::ConfigStore;
-use crate::layout::{VIEW_HEIGHT, VIEW_WIDTH};
 use crate::state::{Phase, Playback, Session, UiState};
+use crate::viewport::{ScreenPos, ViewportRes};
+use crate::z_order;
 
 /// UI 字体。
 #[derive(Resource, Clone)]
 pub struct Fonts {
     /// 主字体。
     pub ui: Handle<Font>,
+}
+
+/// HUD 文本摆放：视口锚点加边距（世界单位），视口变化时由同步系统重排。
+#[derive(Component, Clone, Copy)]
+pub struct HudPlacement {
+    anchor: Anchor,
+    margin_x: f32,
+    margin_y: f32,
+}
+
+impl HudPlacement {
+    fn position(&self, viewport: ViewportRes) -> ScreenPos {
+        let (mx, my) = (self.margin_x, self.margin_y);
+        let a = self.anchor;
+        if a == Anchor::TOP_LEFT {
+            ScreenPos::new(mx, my)
+        } else if a == Anchor::TOP_CENTER {
+            ScreenPos::new(viewport.width / 2.0, my)
+        } else if a == Anchor::TOP_RIGHT {
+            ScreenPos::new(viewport.width - mx, my)
+        } else if a == Anchor::CENTER {
+            ScreenPos::new(viewport.width / 2.0 + mx, viewport.height / 2.0 + my)
+        } else if a == Anchor::BOTTOM_LEFT {
+            ScreenPos::new(mx, viewport.height - my)
+        } else if a == Anchor::BOTTOM_CENTER {
+            ScreenPos::new(viewport.width / 2.0, viewport.height - my)
+        } else {
+            ScreenPos::new(viewport.width - mx, viewport.height - my)
+        }
+    }
 }
 
 /// HUD 文本类型。
@@ -43,42 +75,46 @@ pub enum HudKind {
 }
 
 /// 创建 HUD。
-pub fn spawn_hud(commands: &mut Commands, fonts: &Fonts) {
+pub fn spawn_hud(commands: &mut Commands, fonts: &Fonts, viewport: ViewportRes) {
     spawn_text(
         commands,
         fonts,
         HudKind::Info,
         Anchor::TOP_LEFT,
-        (-390.0, 290.0),
+        (10.0, 10.0),
         16.0,
         Color::srgb(0.92, 0.92, 0.95),
+        viewport,
     );
     spawn_text(
         commands,
         fonts,
         HudKind::Title,
         Anchor::TOP_CENTER,
-        (0.0, 286.0),
+        (0.0, 14.0),
         22.0,
         Color::WHITE,
+        viewport,
     );
     spawn_text(
         commands,
         fonts,
         HudKind::Hints,
         Anchor::BOTTOM_LEFT,
-        (-390.0, -290.0),
+        (10.0, 10.0),
         13.0,
         Color::srgb(0.62, 0.62, 0.68),
+        viewport,
     );
     spawn_text(
         commands,
         fonts,
         HudKind::Warnings,
         Anchor::TOP_RIGHT,
-        (390.0, 250.0),
+        (10.0, 50.0),
         14.0,
         Color::srgb(0.98, 0.82, 0.28),
+        viewport,
     );
     spawn_text(
         commands,
@@ -88,15 +124,17 @@ pub fn spawn_hud(commands: &mut Commands, fonts: &Fonts) {
         (0.0, 0.0),
         18.0,
         Color::srgb(0.95, 0.95, 0.98),
+        viewport,
     );
     spawn_text(
         commands,
         fonts,
         HudKind::Loading,
         Anchor::CENTER,
-        (0.0, 30.0),
+        (0.0, -30.0),
         24.0,
         Color::WHITE,
+        viewport,
     );
     spawn_text(
         commands,
@@ -106,15 +144,17 @@ pub fn spawn_hud(commands: &mut Commands, fonts: &Fonts) {
         (0.0, 0.0),
         20.0,
         Color::srgb(0.98, 0.36, 0.36),
+        viewport,
     );
     spawn_text(
         commands,
         fonts,
         HudKind::Debug,
         Anchor::BOTTOM_RIGHT,
-        (390.0, -290.0),
+        (10.0, 10.0),
         12.0,
         Color::srgb(0.55, 0.75, 0.95),
+        viewport,
     );
 }
 
@@ -123,10 +163,16 @@ fn spawn_text(
     fonts: &Fonts,
     kind: HudKind,
     anchor: Anchor,
-    position: (f32, f32),
+    margin: (f32, f32),
     size: f32,
     color: Color,
+    viewport: ViewportRes,
 ) {
+    let placement = HudPlacement {
+        anchor,
+        margin_x: margin.0,
+        margin_y: margin.1,
+    };
     commands.spawn((
         kind,
         Text2d::new(""),
@@ -138,9 +184,26 @@ fn spawn_text(
         TextColor(color),
         TextLayout::justify(Justify::Left),
         anchor,
-        Transform::from_xyz(position.0, position.1, 10.0),
+        placement,
+        Transform::from_translation(
+            placement
+                .position(viewport)
+                .to_world(viewport, z_order::HUD),
+        ),
         Visibility::Hidden,
     ));
+}
+
+/// 视口尺寸变化时重排全部 HUD 文本。
+pub fn sync_hud(viewport: Res<ViewportRes>, mut query: Query<(&HudPlacement, &mut Transform)>) {
+    if !viewport.is_changed() {
+        return;
+    }
+    for (placement, mut transform) in &mut query {
+        transform.translation = placement
+            .position(*viewport)
+            .to_world(*viewport, z_order::HUD);
+    }
 }
 
 /// 每帧更新 HUD。
@@ -321,6 +384,3 @@ fn truncate_path(path: &std::path::Path) -> String {
         truncated
     }
 }
-
-// 让 VIEW_WIDTH/VIEW_HEIGHT 在布局调整时保持显式依赖。
-const _: (f32, f32) = (VIEW_WIDTH, VIEW_HEIGHT);

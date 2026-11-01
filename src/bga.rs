@@ -10,15 +10,17 @@ use bmsrs::chart::{BgaLayer, BgaResource, CropRect, EventKind};
 use bmsrs::player::Player;
 
 use crate::chart::{PreviewEvent, resolve_path};
-use crate::layout::{VIEW_HEIGHT, VIEW_WIDTH, world_x, world_y};
+use crate::layout::BASIS_WIDTH;
 use crate::state::Session;
+use crate::viewport::{ScreenPos, ViewportRes};
+use crate::z_order;
 
 /// BGA 画布宽度。
 pub const BGA_CANVAS_WIDTH: f32 = 640.0;
 /// BGA 画布高度。
 pub const BGA_CANVAS_HEIGHT: f32 = 480.0;
-/// BGA 画布到虚拟画布的缩放。
-pub const BGA_SCALE: f32 = VIEW_WIDTH / BGA_CANVAS_WIDTH;
+/// BGA 画布到基准带的缩放。
+pub const BGA_SCALE: f32 = BASIS_WIDTH / BGA_CANVAS_WIDTH;
 
 /// 解码后的 BGA 图片。
 pub struct DecodedImage {
@@ -154,7 +156,7 @@ pub fn spawn_sprites(commands: &mut bevy::prelude::Commands) -> BgaSprites {
         *entity = commands
             .spawn((
                 Sprite::default(),
-                Transform::from_xyz(0.0, 0.0, layer_z(index)),
+                Transform::from_xyz(0.0, 0.0, z_order::bga_layer(index)),
                 Visibility::Hidden,
             ))
             .id();
@@ -219,6 +221,7 @@ pub fn decode_bga_images(
 /// 将图层状态同步到精灵。
 pub fn update_bga_sprites(
     session: Res<Session>,
+    viewport: Res<ViewportRes>,
     sprites: Res<BgaSprites>,
     mut sprite_query: Query<&mut Sprite>,
     mut transform_query: Query<&mut Transform>,
@@ -243,6 +246,7 @@ pub fn update_bga_sprites(
         let Some(mut visibility) = visibility_query.get_mut(entity).ok() else {
             continue;
         };
+        let origin = viewport.basis_origin();
 
         sprite.image = info.handle.clone();
         sprite.color = bevy::color::Color::srgba(1.0, 1.0, 1.0, alpha);
@@ -258,8 +262,8 @@ pub fn update_bga_sprites(
             sprite.custom_size = Some(bevy::math::Vec2::new(width * BGA_SCALE, height * BGA_SCALE));
             let screen_x = (crop.dx as f32 + width / 2.0) * BGA_SCALE;
             let screen_y = (BGA_CANVAS_HEIGHT - (crop.dy as f32 + height / 2.0)) * BGA_SCALE;
-            transform.translation =
-                bevy::math::Vec3::new(world_x(screen_x), world_y(screen_y), layer_z(layer));
+            transform.translation = ScreenPos::new(origin.x + screen_x, origin.y + screen_y)
+                .to_world(*viewport, z_order::bga_layer(layer));
         } else {
             let width = info.width as f32;
             let height = info.height as f32;
@@ -267,8 +271,8 @@ pub fn update_bga_sprites(
             sprite.custom_size = Some(bevy::math::Vec2::new(width * BGA_SCALE, height * BGA_SCALE));
             let screen_x = width / 2.0 * BGA_SCALE;
             let screen_y = (BGA_CANVAS_HEIGHT - height / 2.0) * BGA_SCALE;
-            transform.translation =
-                bevy::math::Vec3::new(world_x(screen_x), world_y(screen_y), layer_z(layer));
+            transform.translation = ScreenPos::new(origin.x + screen_x, origin.y + screen_y)
+                .to_world(*viewport, z_order::bga_layer(layer));
         }
         *visibility = Visibility::Visible;
     }
@@ -279,21 +283,6 @@ fn set_hidden(entity: Entity, query: &mut Query<&mut Visibility>) {
         *visibility = Visibility::Hidden;
     }
 }
-
-const fn layer_z(layer: usize) -> f32 {
-    match layer {
-        0 => -10.0,
-        1 => -9.0,
-        2 => -8.0,
-        _ => -7.0,
-    }
-}
-
-/// 视频精灵的 Z。
-pub const VIDEO_Z: f32 = -20.0;
-
-/// 虚拟画布尺寸。
-pub const _CANVAS: (f32, f32) = (VIEW_WIDTH, VIEW_HEIGHT);
 
 #[cfg(test)]
 mod tests {

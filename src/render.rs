@@ -1,14 +1,16 @@
 //! 轨道、音符、小节线与静态场景。
 
 use crate::layout::{
-    JUDGMENT_LINE_Y, LOOKAHEAD_MS, PIXELS_PER_BEAT, REACTION_MS, VIEW_HEIGHT, VIEW_WIDTH,
-    judgment_world_y, world_x, world_y,
+    BASIS_HEIGHT, BASIS_WIDTH, JUDGMENT_WORLD_Y, LOOKAHEAD_MS, PIXELS_PER_BEAT, REACTION_MS,
 };
 use crate::state::Session;
+use crate::viewport::{ScreenPos, ViewportRes};
+use crate::z_order;
 use bevy::camera::{OrthographicProjection, Projection, ScalingMode};
+use bevy::ecs::change_detection::DetectChanges as _;
 use bevy::prelude::{
     Camera2d, Color, Commands, Component, Entity, FontSize, Query, Res, Sprite, Text2d, TextColor,
-    TextFont, TextLayout, Transform, Vec2, Vec3, Visibility, With,
+    TextFont, TextLayout, Transform, Vec2, Visibility, With,
 };
 use bevy::sprite::Anchor;
 use bevy::text::Justify;
@@ -17,6 +19,25 @@ use bmsrs::chart::{EventKind, Lane, NoteKind};
 /// 谱面实体标记；换谱时统一清理。
 #[derive(Component)]
 pub struct ChartEntity;
+
+/// 轨道背景精灵：记录基准带内几何，视口变化时由同步系统重排。
+#[derive(Component)]
+pub struct TrackBg {
+    basis_center_x: f32,
+    width: f32,
+}
+
+/// 轨道边界线精灵。
+#[derive(Component)]
+pub struct TrackEdge {
+    basis_x: f32,
+}
+
+/// 轨道标签文本。
+#[derive(Component)]
+pub struct TrackLabelMarker {
+    basis_center_x: f32,
+}
 
 /// 音符部件。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,8 +85,8 @@ pub fn setup_scene(commands: &mut Commands) {
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scaling_mode: ScalingMode::AutoMin {
-                min_width: VIEW_WIDTH,
-                min_height: VIEW_HEIGHT,
+                min_width: BASIS_WIDTH,
+                min_height: BASIS_HEIGHT,
             },
             ..OrthographicProjection::default_2d()
         }),
@@ -73,7 +94,7 @@ pub fn setup_scene(commands: &mut Commands) {
 
     commands.spawn((
         Sprite::from_color(COLOR_BG, Vec2::new(2000.0, 1400.0)),
-        Transform::from_xyz(0.0, 0.0, -100.0),
+        Transform::from_xyz(0.0, 0.0, z_order::BACKGROUND),
     ));
 }
 
@@ -85,26 +106,40 @@ pub fn despawn_chart(commands: &mut Commands, query: &Query<Entity, With<ChartEn
 }
 
 /// 生成轨道、音符与小节线。
-pub fn spawn_chart(commands: &mut Commands, session: &Session, fonts: &crate::ui::Fonts) {
+pub fn spawn_chart(
+    commands: &mut Commands,
+    session: &Session,
+    fonts: &crate::ui::Fonts,
+    viewport: ViewportRes,
+) {
     let Some(loaded) = session.loaded.as_ref() else {
         return;
     };
     let layout = &session.layout;
     let (left, right) = layout.bounds();
     let total_width = right - left;
+    let origin = viewport.basis_origin();
 
     for track in &layout.tracks {
         let center = track.x + track.width / 2.0;
+        let at = |basis_x: f32, screen_y: f32, z: f32| {
+            ScreenPos::new(origin.x + basis_x, screen_y).to_world(viewport, z)
+        };
         commands.spawn((
             ChartEntity,
-            Sprite::from_color(COLOR_TRACK_BG, Vec2::new(track.width, VIEW_HEIGHT)),
-            Transform::from_xyz(world_x(center), 0.0, -1.0),
+            TrackBg {
+                basis_center_x: center,
+                width: track.width,
+            },
+            Sprite::from_color(COLOR_TRACK_BG, Vec2::new(track.width, viewport.height)),
+            Transform::from_translation(at(center, viewport.height / 2.0, z_order::TRACK_BG)),
         ));
         for edge in [track.x, track.x + track.width] {
             commands.spawn((
                 ChartEntity,
-                Sprite::from_color(COLOR_TRACK_LINE, Vec2::new(1.0, VIEW_HEIGHT)),
-                Transform::from_xyz(world_x(edge), 0.0, -0.5),
+                TrackEdge { basis_x: edge },
+                Sprite::from_color(COLOR_TRACK_LINE, Vec2::new(1.0, viewport.height)),
+                Transform::from_translation(at(edge, viewport.height / 2.0, z_order::TRACK_LINE)),
             ));
         }
         if layout.len() <= 16 {
@@ -119,15 +154,19 @@ pub fn spawn_chart(commands: &mut Commands, session: &Session, fonts: &crate::ui
                 TextColor(COLOR_LABEL),
                 TextLayout::justify(Justify::Center),
                 Anchor::TOP_CENTER,
-                Transform::from_xyz(world_x(center), world_y(VIEW_HEIGHT - 10.0), 2.5),
+                TrackLabelMarker {
+                    basis_center_x: center,
+                },
+                Transform::from_translation(at(center, 10.0, z_order::TRACK_LABEL)),
             ));
         }
     }
 
     commands.spawn((
         ChartEntity,
+        JudgmentLineMarker,
         Sprite::from_color(Color::WHITE, Vec2::new(total_width + 24.0, 3.0)),
-        Transform::from_xyz(0.0, judgment_world_y(), 2.0),
+        Transform::from_xyz(0.0, JUDGMENT_WORLD_Y, z_order::JUDGMENT_LINE),
     ));
 
     for event in &loaded.player.chart().data.events {
@@ -137,7 +176,7 @@ pub fn spawn_chart(commands: &mut Commands, session: &Session, fonts: &crate::ui
                     ChartEntity,
                     BarVisual { tick: event.tick() },
                     Sprite::from_color(COLOR_BAR, Vec2::new(total_width.max(1.0), 1.0)),
-                    Transform::from_xyz(0.0, 0.0, -0.4),
+                    Transform::from_xyz(0.0, 0.0, z_order::BAR),
                     Visibility::Hidden,
                 ));
             }
@@ -161,6 +200,10 @@ pub fn spawn_chart(commands: &mut Commands, session: &Session, fonts: &crate::ui
     }
 }
 
+/// 判定线实体标记；位置固定于世界坐标，不随视口同步。
+#[derive(Component)]
+struct JudgmentLineMarker;
+
 fn spawn_note(
     commands: &mut Commands,
     tick: u64,
@@ -175,9 +218,17 @@ fn spawn_note(
         _ => note_color(lane, track),
     };
     let (size, z, rotation) = match kind {
-        NoteKind::Mine { .. } => (Vec2::splat((width / 3.0).max(6.0)), 1.4, 0.785_398_2),
-        NoteKind::Invisible => (Vec2::splat(8.0), 1.2, 0.0),
-        _ => (Vec2::new((width - 4.0).max(2.0), 8.0), 1.0, 0.0),
+        NoteKind::Mine { .. } => (
+            Vec2::splat((width / 3.0).max(6.0)),
+            z_order::NOTE_MINE,
+            0.785_398_2,
+        ),
+        NoteKind::Invisible => (Vec2::splat(8.0), z_order::NOTE_INVISIBLE, 0.0),
+        _ => (
+            Vec2::new((width - 4.0).max(2.0), 8.0),
+            z_order::NOTE_HEAD,
+            0.0,
+        ),
     };
     commands.spawn((
         ChartEntity,
@@ -210,7 +261,7 @@ fn spawn_note(
                 with_alpha(base_color, 0.35),
                 Vec2::new((width - 4.0).max(2.0), 1.0),
             ),
-            Transform::from_xyz(0.0, 0.0, 0.9),
+            Transform::from_xyz(0.0, 0.0, z_order::LONG_BODY),
             Visibility::Hidden,
         ));
     }
@@ -229,9 +280,62 @@ const fn note_color(lane: Lane, track: usize) -> Color {
     }
 }
 
+/// 滚动位置差换算为屏幕像素：SCROLL 积分差乘 SPEED 事件端倍率。
+const fn scroll_offset_px(scroll_diff: f64, spacing: f64) -> f32 {
+    (scroll_diff * spacing) as f32 * PIXELS_PER_BEAT
+}
+
+/// 判定线的屏幕 Y：固定世界坐标，视口居中扩展时上下均匀。
+const fn judgment_screen_y(viewport_height: f32) -> f32 {
+    viewport_height / 2.0 - JUDGMENT_WORLD_Y
+}
+
+/// 事件的屏幕 Y：判定线减去滚动偏移；`spacing` 必须取该事件自身 tick 的倍率。
+const fn event_screen_y(viewport_height: f32, scroll_diff: f64, spacing: f64) -> f32 {
+    judgment_screen_y(viewport_height) - scroll_offset_px(scroll_diff, spacing)
+}
+
+/// 长音身体的屏幕几何：中心 Y 与高度。
+const fn body_geometry(top: f32, bottom: f32) -> (f32, f32) {
+    (f32::midpoint(top, bottom), (bottom - top).max(1.0))
+}
+
+/// 屏幕 Y 是否落在可见窗口（含上下余量）。
+const fn y_visible(y: f32, viewport_height: f32, margin: f32) -> bool {
+    y >= -margin && y <= viewport_height + margin
+}
+
+/// 视口尺寸变化时重排轨道背景、边界线与标签。
+pub fn sync_static_visuals(
+    viewport: Res<ViewportRes>,
+    mut backgrounds: Query<(&TrackBg, &mut Sprite, &mut Transform)>,
+    mut edges: Query<(&TrackEdge, &mut Sprite, &mut Transform)>,
+    mut labels: Query<(&TrackLabelMarker, &mut Transform)>,
+) {
+    if !viewport.is_changed() {
+        return;
+    }
+    let origin = viewport.basis_origin();
+    for (bg, mut sprite, mut transform) in &mut backgrounds {
+        sprite.custom_size = Some(Vec2::new(bg.width, viewport.height));
+        transform.translation = ScreenPos::new(origin.x + bg.basis_center_x, viewport.height / 2.0)
+            .to_world(*viewport, z_order::TRACK_BG);
+    }
+    for (edge, mut sprite, mut transform) in &mut edges {
+        sprite.custom_size = Some(Vec2::new(1.0, viewport.height));
+        transform.translation = ScreenPos::new(origin.x + edge.basis_x, viewport.height / 2.0)
+            .to_world(*viewport, z_order::TRACK_LINE);
+    }
+    for (label, mut transform) in &mut labels {
+        transform.translation = ScreenPos::new(origin.x + label.basis_center_x, 10.0)
+            .to_world(*viewport, z_order::TRACK_LABEL);
+    }
+}
+
 /// 更新音符位置。
 pub fn update_notes(
     session: Res<Session>,
+    viewport: Res<ViewportRes>,
     mut query: Query<(&NoteVisual, &mut Transform, &mut Sprite, &mut Visibility)>,
 ) {
     let Some(loaded) = session.loaded.as_ref() else {
@@ -240,20 +344,18 @@ pub fn update_notes(
     let player = &loaded.player;
     let current_tick = player.current_tick();
     let current_scroll = player.scroll_position_at(current_tick);
+    let origin_x = viewport.basis_origin().x;
 
     for (note, mut transform, mut sprite, mut visibility) in &mut query {
         let note_scroll = player.scroll_position_at(note.tick);
         let scroll_diff = note_scroll - current_scroll;
-        let spacing = player.spacing_at(note.tick);
-        let y = JUDGMENT_LINE_Y - scroll_diff as f32 * PIXELS_PER_BEAT * spacing as f32;
-        let x = session.layout.center_x(note.track);
-        let world_x_value = world_x(x);
+        let y = event_screen_y(viewport.height, scroll_diff, player.spacing_at(note.tick));
+        let screen = ScreenPos::new(origin_x + session.layout.center_x(note.track), y);
 
         match note.part {
             NotePart::Head => {
-                transform.translation =
-                    Vec3::new(world_x_value, world_y(y), transform.translation.z);
-                *visibility = if (-50.0..=VIEW_HEIGHT + 50.0).contains(&y) {
+                transform.translation = screen.to_world(*viewport, transform.translation.z);
+                *visibility = if y_visible(y, viewport.height, 50.0) {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
@@ -266,18 +368,15 @@ pub fn update_notes(
                 };
                 let end_scroll = player.scroll_position_at(end_tick);
                 let end_diff = end_scroll - current_scroll;
-                let end_y = JUDGMENT_LINE_Y - end_diff as f32 * PIXELS_PER_BEAT * spacing as f32;
+                let end_y = event_screen_y(viewport.height, end_diff, player.spacing_at(end_tick));
                 let top = y.min(end_y);
                 let bottom = y.max(end_y);
-                let height = (bottom - top).max(1.0);
+                let (center, height) = body_geometry(top, bottom);
                 sprite.custom_size =
                     Some(Vec2::new(session.layout.width(note.track) - 4.0, height));
-                transform.translation = Vec3::new(
-                    world_x_value,
-                    world_y(f32::midpoint(top, bottom)),
-                    transform.translation.z,
-                );
-                *visibility = if bottom >= -50.0 && top <= VIEW_HEIGHT + 50.0 {
+                transform.translation =
+                    ScreenPos::new(screen.x, center).to_world(*viewport, transform.translation.z);
+                *visibility = if bottom >= -50.0 && top <= viewport.height + 50.0 {
                     Visibility::Visible
                 } else {
                     Visibility::Hidden
@@ -290,6 +389,7 @@ pub fn update_notes(
 /// 更新小节线。
 pub fn update_bars(
     session: Res<Session>,
+    viewport: Res<ViewportRes>,
     mut query: Query<(&BarVisual, &mut Transform, &mut Visibility)>,
 ) {
     let Some(loaded) = session.loaded.as_ref() else {
@@ -304,13 +404,67 @@ pub fn update_bars(
     );
 
     for (bar, mut transform, mut visibility) in &mut query {
-        let y = JUDGMENT_LINE_Y
-            - (player.scroll_position_at(bar.tick) - current_scroll) as f32 * PIXELS_PER_BEAT;
-        transform.translation.y = world_y(y);
-        *visibility = if bar.tick >= start_tick && (-20.0..=VIEW_HEIGHT + 20.0).contains(&y) {
+        let diff = player.scroll_position_at(bar.tick) - current_scroll;
+        let y = event_screen_y(viewport.height, diff, player.spacing_at(bar.tick));
+        transform.translation.y = viewport.height / 2.0 - y;
+        *visibility = if bar.tick >= start_tick && y_visible(y, viewport.height, 20.0) {
             Visibility::Visible
         } else {
             Visibility::Hidden
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn judgment_line_sits_below_viewport_center() {
+        assert!((judgment_screen_y(600.0) - 500.0).abs() < 1e-5);
+        // 窄窗口扩展：判定线固定世界坐标，屏幕位置随视口居中
+        assert!((judgment_screen_y(1066.0) - 733.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn future_events_render_above_judgment_line() {
+        let y = event_screen_y(600.0, 1.0, 1.0);
+        assert!(y < judgment_screen_y(600.0));
+        assert!((y - (500.0 - PIXELS_PER_BEAT)).abs() < 1e-4);
+    }
+
+    #[test]
+    fn scroll_offset_scales_with_spacing() {
+        assert!((scroll_offset_px(1.0, 1.0) - PIXELS_PER_BEAT).abs() < 1e-5);
+        assert!((scroll_offset_px(1.0, 2.0) - 2.0 * PIXELS_PER_BEAT).abs() < 1e-5);
+        assert!((scroll_offset_px(2.0, 0.5) - PIXELS_PER_BEAT).abs() < 1e-5);
+    }
+
+    #[test]
+    fn ln_tail_uses_endpoint_spacing() {
+        // 回归：长音尾部必须用尾部 tick 的 SPEED 倍率，而非头部值
+        let head = event_screen_y(600.0, 1.0, 2.0);
+        let tail = event_screen_y(600.0, 2.0, 0.5);
+        let wrong_if_reusing_head = event_screen_y(600.0, 2.0, 2.0);
+        assert_ne!(tail, wrong_if_reusing_head);
+        assert!(tail > head);
+    }
+
+    #[test]
+    fn body_geometry_returns_center_and_min_height() {
+        let (center, height) = body_geometry(100.0, 300.0);
+        assert!((center - 200.0).abs() < 1e-5);
+        assert!((height - 200.0).abs() < 1e-5);
+        let (_, min_height) = body_geometry(300.0, 300.0);
+        assert!((min_height - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn visibility_window_tracks_viewport_height() {
+        assert!(y_visible(50.0, 600.0, 50.0));
+        assert!(y_visible(-50.0, 600.0, 50.0));
+        assert!(!y_visible(-51.0, 600.0, 50.0));
+        assert!(y_visible(650.0, 600.0, 50.0));
+        assert!(!y_visible(651.0, 600.0, 50.0));
     }
 }

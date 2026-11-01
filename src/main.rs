@@ -12,6 +12,8 @@ mod render;
 mod state;
 mod ui;
 mod video;
+mod viewport;
+mod z_order;
 
 use std::path::PathBuf;
 
@@ -25,6 +27,7 @@ use crate::chart::{LoadOptions, ModeChoice, random_seed};
 use crate::config::ConfigStore;
 use crate::picker::Picker;
 use crate::state::{Playback, SampleRate, Session, StartupOptions, UiState};
+use crate::viewport::ViewportRes;
 
 /// 命令行参数。
 #[derive(Parser, Debug)]
@@ -100,11 +103,14 @@ fn main() {
         .insert_resource(LoadWorker::new())
         .insert_resource(SampleRate(sample_rate))
         .insert_resource(Session::default())
+        .insert_resource(ViewportRes::default())
         .insert_non_send(audio)
         .add_systems(Startup, startup)
         .add_systems(
             Update,
             (
+                viewport::update_viewport,
+                (render::sync_static_visuals, ui::sync_hud),
                 (input_system, worker_system, clock_system),
                 (
                     bga::update_bga_sprites,

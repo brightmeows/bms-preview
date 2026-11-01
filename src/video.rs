@@ -14,7 +14,7 @@ use bmsrs::player::Player;
 use video_rs::{Decoder, Error as VideoError};
 
 use crate::chart::{PreviewEvent, VideoSource};
-use crate::layout::{VIEW_HEIGHT, VIEW_WIDTH};
+use crate::layout::{BASIS_HEIGHT, BASIS_WIDTH};
 use crate::state::{Playback, Session};
 
 /// 视频解码命令。
@@ -443,7 +443,7 @@ pub fn spawn_sprite(commands: &mut bevy::prelude::Commands) -> VideoSprite {
     let entity = commands
         .spawn((
             Sprite::default(),
-            Transform::from_xyz(0.0, 0.0, crate::bga::VIDEO_Z),
+            Transform::from_xyz(0.0, 0.0, crate::z_order::VIDEO),
             Visibility::Hidden,
         ))
         .id();
@@ -532,11 +532,11 @@ pub fn update_video_sprite(
     };
     let width = f32::from(u16::try_from(frame_width).unwrap_or(u16::MAX));
     let height = f32::from(u16::try_from(frame_height).unwrap_or(u16::MAX));
-    let scale = (VIEW_WIDTH / width).min(VIEW_HEIGHT / height);
+    let scale = (BASIS_WIDTH / width).min(BASIS_HEIGHT / height);
     sprite.image = handle;
     sprite.custom_size = Some(bevy::math::Vec2::new(width * scale, height * scale));
     sprite.rect = None;
-    transform.translation = bevy::math::Vec3::new(0.0, 0.0, crate::bga::VIDEO_Z);
+    transform.translation = bevy::math::Vec3::new(0.0, 0.0, crate::z_order::VIDEO);
     *visibility = Visibility::Visible;
 }
 
