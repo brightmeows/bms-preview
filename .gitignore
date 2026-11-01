@@ -3,3 +3,6 @@
 
 # Local bmsrs patch
 /.cargo/config.toml
+
+# Git worktrees
+/.worktrees

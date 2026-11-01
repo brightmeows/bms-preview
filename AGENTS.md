@@ -48,6 +48,8 @@ pre-commit run --all-files
 
 - `[lints]` 与 `clippy.toml` 复制自 `bmsrs`；`missing_docs_in_private_items`
   在 app 中放行。bmsrs 调整 lint 时同步更新。
+- Git worktree 统一放在 `.worktrees/` 目录下（已 gitignore）。
+- main 分支受远端 ruleset 保护：改动从 main 建分支推送并开 PR，CI 通过后合并。
 - 只通过 `bmsrs` facade 使用库 API，不直连子 crate。
 - `publish = false`：本仓只维护源码，不做 Release / crates.io 分发。
 - 平台 Linux-first；Wayland 优先，保留 X11 回退。文件选择器走 XDG portal。
