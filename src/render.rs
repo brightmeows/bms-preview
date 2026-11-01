@@ -80,22 +80,25 @@ const COLOR_NOTE_INVISIBLE: Color = Color::srgba(0.65, 0.65, 0.68, 0.45);
 const COLOR_LABEL: Color = Color::srgb(0.72, 0.72, 0.76);
 
 /// 创建相机与背景。
-pub fn setup_scene(commands: &mut Commands) {
-    commands.spawn((
-        Camera2d,
-        Projection::Orthographic(OrthographicProjection {
-            scaling_mode: ScalingMode::AutoMin {
-                min_width: BASIS_WIDTH,
-                min_height: BASIS_HEIGHT,
-            },
-            ..OrthographicProjection::default_2d()
-        }),
-    ));
+pub fn setup_scene(commands: &mut Commands) -> Entity {
+    let camera = commands
+        .spawn((
+            Camera2d,
+            Projection::Orthographic(OrthographicProjection {
+                scaling_mode: ScalingMode::AutoMin {
+                    min_width: BASIS_WIDTH,
+                    min_height: BASIS_HEIGHT,
+                },
+                ..OrthographicProjection::default_2d()
+            }),
+        ))
+        .id();
 
     commands.spawn((
         Sprite::from_color(COLOR_BG, Vec2::new(2000.0, 1400.0)),
         Transform::from_xyz(0.0, 0.0, z_order::BACKGROUND),
     ));
+    camera
 }
 
 /// 清理旧谱面实体。

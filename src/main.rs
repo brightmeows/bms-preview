@@ -1,8 +1,10 @@
 //! bms-preview：Bevy 谱面预览器入口。
 
+mod actions;
 mod app;
 mod audio;
 mod bga;
+mod buttons;
 mod chart;
 mod config;
 mod font;
@@ -112,6 +114,7 @@ fn main() {
                 viewport::update_viewport,
                 (render::sync_static_visuals, ui::sync_hud),
                 (input_system, worker_system, clock_system),
+                buttons::maintain_buttons,
                 (
                     bga::update_bga_sprites,
                     video::update_video_sprite,

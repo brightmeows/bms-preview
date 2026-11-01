@@ -60,8 +60,6 @@ pub enum HudKind {
     Info,
     /// 顶部标题。
     Title,
-    /// 底部键位提示。
-    Hints,
     /// 警告面板。
     Warnings,
     /// 最近文件菜单。
@@ -94,16 +92,6 @@ pub fn spawn_hud(commands: &mut Commands, fonts: &Fonts, viewport: ViewportRes) 
         (0.0, 14.0),
         22.0,
         Color::WHITE,
-        viewport,
-    );
-    spawn_text(
-        commands,
-        fonts,
-        HudKind::Hints,
-        Anchor::BOTTOM_LEFT,
-        (10.0, 10.0),
-        13.0,
-        Color::srgb(0.62, 0.62, 0.68),
         viewport,
     );
     spawn_text(
@@ -274,14 +262,6 @@ pub fn update_hud(
                 } else {
                     *visibility = Visibility::Hidden;
                 }
-            }
-            HudKind::Hints => {
-                text.0 = "O 打开   Space 暂停   R 重播   ←/→ 5s   Home/End   ↑/↓ 倍速   +/- 音量   M 静音\nN 重掷 seed   L 布局   Tab 最近文件   W 警告   F3 调试   F 全屏   Q 退出".to_owned();
-                *visibility = if session.loaded.is_some() {
-                    Visibility::Visible
-                } else {
-                    Visibility::Hidden
-                };
             }
             HudKind::Warnings => {
                 if ui.show_warnings && !ui.warnings.is_empty() {

@@ -194,10 +194,14 @@ pub struct UiState {
     pub show_warnings: bool,
     /// 最近文件菜单是否打开。
     pub recent_open: bool,
+    /// "更多"操作面板是否打开。
+    pub more_open: bool,
     /// 最近文件选中索引。
     pub recent_index: usize,
     /// 是否显示调试信息。
     pub debug: bool,
+    /// 光标是否悬停在按钮栏上（用于与 seek 热区互斥）。
+    pub bar_hovered: bool,
 }
 
 impl Default for UiState {
@@ -209,8 +213,10 @@ impl Default for UiState {
             warnings: Vec::new(),
             show_warnings: false,
             recent_open: false,
+            more_open: false,
             recent_index: 0,
             debug: false,
+            bar_hovered: false,
         }
     }
 }

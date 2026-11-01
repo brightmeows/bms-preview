@@ -8,15 +8,15 @@ use std::time::Duration;
 use bevy::asset::Assets;
 use bevy::image::Image;
 use bevy::prelude::*;
-use bevy::window::{FileDragAndDrop, MonitorSelection, PrimaryWindow, WindowMode};
+use bevy::window::{FileDragAndDrop, PrimaryWindow};
 use bmsrs::chart::EventKind;
 use bmsrs::player::Player;
 
+use crate::actions::{ActionContext, UiAction, run_action};
 use crate::audio::{AudioBackend, SlicedSample, decode_audio_assets};
 use crate::bga::{DecodedImage, decode_bga_images};
-use crate::chart::{
-    LoadOptions, LoadedChart, ModeChoice, ModeKind, PreviewEvent, load_chart, random_seed,
-};
+use crate::buttons::spawn_buttons;
+use crate::chart::{LoadOptions, LoadedChart, ModeChoice, PreviewEvent, load_chart, random_seed};
 use crate::config::ConfigStore;
 use crate::font::load_ui_font;
 use crate::layout::infer_layout;
@@ -195,9 +195,10 @@ pub fn startup(
     viewport: Res<ViewportRes>,
     mut audio: NonSendMut<AudioBackend>,
 ) {
-    setup_scene(&mut commands);
+    let camera = setup_scene(&mut commands);
     let font = load_ui_font(&mut fonts_assets);
     let fonts = Fonts { ui: font };
+    spawn_buttons(&mut commands, camera, &fonts);
     spawn_hud(&mut commands, &fonts, *viewport);
     commands.insert_resource(fonts);
     let bga_sprites = crate::bga::spawn_sprites(&mut commands);
@@ -257,9 +258,10 @@ pub fn input_system(
     mut drag: MessageReader<FileDragAndDrop>,
     mut exit: MessageWriter<AppExit>,
 ) {
-    let clock = audio
-        .clock_seconds()
-        .unwrap_or_else(|| playback.wall_seconds());
+    let Ok(mut window) = windows.single_mut() else {
+        return;
+    };
+    let window = &mut window;
 
     for event in drag.read() {
         if let FileDragAndDrop::DroppedFile { path_buf, .. } = event
@@ -314,183 +316,102 @@ pub fn input_system(
         return;
     }
 
-    if keys.just_pressed(KeyCode::KeyO) {
-        picker.open(config.config.last_dir.clone());
-        ui.recent_open = false;
-    }
-    if keys.just_pressed(KeyCode::Tab) {
-        ui.recent_open = true;
-        ui.recent_index = 0;
-        ui.recent_index = ui
-            .recent_index
-            .min(config.config.recent.len().saturating_sub(1));
-    }
-    if keys.just_pressed(KeyCode::KeyW) {
-        ui.show_warnings = !ui.show_warnings;
-    }
-    if keys.just_pressed(KeyCode::F3) {
-        ui.debug = !ui.debug;
-    }
-    if keys.just_pressed(KeyCode::KeyF)
-        && let Ok(mut window) = windows.single_mut()
+    let mut quit_requested = false;
     {
-        window.mode = if matches!(window.mode, WindowMode::Windowed) {
-            WindowMode::BorderlessFullscreen(MonitorSelection::Current)
-        } else {
-            WindowMode::Windowed
+        let mut ctx = ActionContext {
+            session: &session,
+            playback: &mut playback,
+            ui: &mut ui,
+            config: &mut config,
+            picker: &mut picker,
+            worker: &mut worker,
+            audio: &mut audio,
+            sample_rate: sample_rate.0,
         };
-    }
-    if keys.just_pressed(KeyCode::KeyQ) {
-        exit.write(AppExit::Success);
-    }
-    if keys.just_pressed(KeyCode::Escape) {
-        ui.show_warnings = false;
-    }
-
-    let duration = session
-        .loaded
-        .as_ref()
-        .map_or(Duration::ZERO, LoadedChart::duration);
-
-    if keys.just_pressed(KeyCode::Space) && session.loaded.is_some() && !playback.finished {
-        if playback.playing {
-            playback.pause(clock);
-            audio.pause_all();
-        } else {
-            playback.resume(clock);
-            audio.resume_all();
+        if keys.just_pressed(KeyCode::KeyO) {
+            quit_requested |= run_action(UiAction::OpenFile, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Tab) && !ctx.ui.recent_open {
+            quit_requested |= run_action(UiAction::ToggleRecent, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyW) {
+            quit_requested |= run_action(UiAction::ToggleWarnings, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::F3) {
+            quit_requested |= run_action(UiAction::ToggleDebug, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyF) {
+            quit_requested |= run_action(UiAction::ToggleFullscreen, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyQ) {
+            quit_requested |= run_action(UiAction::Quit, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Escape) {
+            ctx.ui.show_warnings = false;
+        }
+        if keys.just_pressed(KeyCode::Space) {
+            quit_requested |= run_action(UiAction::TogglePause, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyR) {
+            quit_requested |= run_action(UiAction::Restart, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::ArrowLeft) {
+            quit_requested |= run_action(UiAction::SeekBack, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::ArrowRight) {
+            quit_requested |= run_action(UiAction::SeekForward, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Home) {
+            quit_requested |= run_action(UiAction::SeekStart, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::End) {
+            quit_requested |= run_action(UiAction::SeekEnd, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::ArrowUp) {
+            quit_requested |= run_action(UiAction::SpeedUp, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::ArrowDown) {
+            quit_requested |= run_action(UiAction::SpeedDown, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Equal) || keys.just_pressed(KeyCode::NumpadAdd) {
+            quit_requested |= run_action(UiAction::VolumeUp, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Minus) || keys.just_pressed(KeyCode::NumpadSubtract) {
+            quit_requested |= run_action(UiAction::VolumeDown, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyM) {
+            quit_requested |= run_action(UiAction::ToggleMute, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Period) {
+            quit_requested |= run_action(UiAction::OffsetUp, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::Comma) {
+            quit_requested |= run_action(UiAction::OffsetDown, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyN) {
+            quit_requested |= run_action(UiAction::RerollSeed, &mut ctx, window);
+        }
+        if keys.just_pressed(KeyCode::KeyL) {
+            quit_requested |= run_action(UiAction::ToggleLayout, &mut ctx, window);
         }
     }
-    if keys.just_pressed(KeyCode::KeyR) && session.loaded.is_some() {
-        playback.request_seek(Duration::ZERO);
-        playback.playing = true;
-        playback.finished = false;
-        audio.stop_all();
-    }
-    if keys.just_pressed(KeyCode::ArrowLeft) {
-        let target = playback.chart_time.saturating_sub(Duration::from_secs(5));
-        playback.request_seek(target);
-        audio.stop_all();
-    }
-    if keys.just_pressed(KeyCode::ArrowRight) {
-        let target = (playback.chart_time + Duration::from_secs(5)).min(duration);
-        playback.request_seek(target);
-        audio.stop_all();
-    }
-    if keys.just_pressed(KeyCode::Home) {
-        playback.request_seek(Duration::ZERO);
-        audio.stop_all();
-    }
-    if keys.just_pressed(KeyCode::End) {
-        playback.request_seek(duration);
-        audio.stop_all();
-    }
-
-    let mut speed = playback.speed;
-    if keys.just_pressed(KeyCode::ArrowUp) {
-        speed += 0.05;
-    }
-    if keys.just_pressed(KeyCode::ArrowDown) {
-        speed -= 0.05;
-    }
-    speed = speed.clamp(0.25, 2.0);
-    if (speed - playback.speed).abs() > f64::EPSILON {
-        playback.rebase(clock);
-        playback.speed = speed;
-        audio.set_speed(speed);
-        config.config.speed = speed;
-        config.mark_dirty();
-    }
-
-    let mut volume = playback.volume;
-    if keys.just_pressed(KeyCode::Equal) || keys.just_pressed(KeyCode::NumpadAdd) {
-        volume += 0.05;
-    }
-    if keys.just_pressed(KeyCode::Minus) || keys.just_pressed(KeyCode::NumpadSubtract) {
-        volume -= 0.05;
-    }
-    volume = volume.clamp(0.0, 1.0);
-    if (volume - playback.volume).abs() > f32::EPSILON {
-        playback.volume = volume;
-        audio.set_volume(playback.effective_volume());
-        config.config.volume = volume;
-        config.mark_dirty();
-    }
-    if keys.just_pressed(KeyCode::KeyM) {
-        playback.muted = !playback.muted;
-        audio.set_volume(playback.effective_volume());
-        config.mark_dirty();
-    }
-    let mut offset = playback.offset_ms;
-    if keys.just_pressed(KeyCode::Period) {
-        offset += 5;
-    }
-    if keys.just_pressed(KeyCode::Comma) {
-        offset -= 5;
-    }
-    offset = offset.clamp(-500, 500);
-    if offset != playback.offset_ms {
-        playback.offset_ms = offset;
-        config.config.offset_ms = offset;
-        config.mark_dirty();
-    }
-
-    if keys.just_pressed(KeyCode::KeyN)
-        && let Some(loaded) = session.loaded.as_ref()
-    {
-        let path = loaded.path.clone();
-        let mode = match loaded.mode {
-            ModeKind::Bme => ModeChoice::Bme,
-            ModeKind::Pms => ModeChoice::Pms,
-            ModeKind::Bmson => ModeChoice::Auto,
-        };
-        begin_load(
-            &mut *worker,
-            &mut *config,
-            &mut *ui,
-            &mut *playback,
-            &mut *audio,
-            path,
-            LoadOptions {
-                seed: random_seed(),
-                mode,
-            },
-            sample_rate.0,
-        );
-    }
-    if keys.just_pressed(KeyCode::KeyL)
-        && let Some(loaded) = session.loaded.as_ref()
-        && loaded.mode != ModeKind::Bmson
-    {
-        let path = loaded.path.clone();
-        let mode = if loaded.mode == ModeKind::Pms {
-            ModeChoice::Bme
-        } else {
-            ModeChoice::Pms
-        };
-        begin_load(
-            &mut *worker,
-            &mut *config,
-            &mut *ui,
-            &mut *playback,
-            &mut *audio,
-            path,
-            LoadOptions {
-                seed: loaded.seed,
-                mode,
-            },
-            sample_rate.0,
-        );
+    if quit_requested {
+        exit.write(AppExit::Success);
     }
 
     if mouse.just_pressed(MouseButton::Left)
         && !ui.recent_open
+        && !ui.bar_hovered
         && session.loaded.is_some()
         && let Ok(window) = windows.single()
         && let Some(cursor) = window.cursor_position()
         && let screen = crate::viewport::cursor_to_screen(cursor, window, *viewport)
         && screen.y > viewport.height - 24.0
     {
+        let duration = session
+            .loaded
+            .as_ref()
+            .map_or(Duration::ZERO, LoadedChart::duration);
         let fraction = f64::from((screen.x / viewport.width).clamp(0.0, 1.0));
         let target = duration.mul_f64(fraction);
         playback.request_seek(target);
@@ -648,7 +569,7 @@ fn apply_load(
     config.mark_dirty();
 }
 
-fn begin_load(
+pub fn begin_load(
     worker: &mut LoadWorker,
     config: &mut ConfigStore,
     ui: &mut UiState,

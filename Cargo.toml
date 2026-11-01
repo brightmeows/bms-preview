@@ -34,6 +34,8 @@ bevy = { version = "0.20.0", default-features = false, features = [
     "bevy_sprite",
     "bevy_sprite_render",
     "bevy_text",
+    "bevy_ui",
+    "bevy_ui_widgets",
     "bevy_window",
     "bevy_winit",
     "bmp",
@@ -44,6 +46,7 @@ bevy = { version = "0.20.0", default-features = false, features = [
     "mouse",
     "multi_threaded",
     "std",
+    "ui_picking",
     "wayland",
     "x11",
 ] }
