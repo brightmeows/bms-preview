@@ -12,6 +12,7 @@ cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test --quiet
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+cargo deny check
 pre-commit run --all-files
 ```
 
