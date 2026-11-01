@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 const MAX_RECENT: usize = 10;
-const DEFAULT_WIDTH: f32 = 1000.0;
-const DEFAULT_HEIGHT: f32 = 700.0;
+const DEFAULT_WIDTH: f32 = 1280.0;
+const DEFAULT_HEIGHT: f32 = 720.0;
 
 /// 持久化配置。
 #[derive(Clone, Debug, Serialize, Deserialize)]
