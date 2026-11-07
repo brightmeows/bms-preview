@@ -131,9 +131,11 @@ impl BgaState {
 
     fn apply_chart_event(&mut self, kind: &EventKind<(), PreviewEvent>) {
         match kind {
-            EventKind::Bga { layer, resource_id } => {
-                self.apply_event(*layer, resource_id.get());
-            }
+            EventKind::Bga { layer, resource_id } => match resource_id {
+                Some(id) => self.apply_event(*layer, id.get()),
+                // 0.0.1 起 None 表示引用未定义的 BMP 索引，清空该图层。
+                None => self.current[layer_index(*layer)] = None,
+            },
             EventKind::Custom(PreviewEvent::BgaOpacity { layer, opacity }) => {
                 self.apply_opacity(*layer, *opacity);
             }

@@ -688,7 +688,7 @@ fn replay_bgm(audio: &mut AudioBackend, player: &Player<(), PreviewEvent>, targe
 
 fn audio_index(kind: &EventKind<(), PreviewEvent>) -> Option<u32> {
     match kind {
-        EventKind::Note { audio, .. } => audio.primary().map(bmsrs::chart::AudioIndex::get),
+        EventKind::Note(note) => note.audio.primary().map(bmsrs::chart::AudioIndex::get),
         EventKind::Bgm { audio_index } => Some(audio_index.get()),
         _ => None,
     }

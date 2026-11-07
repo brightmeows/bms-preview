@@ -172,7 +172,7 @@ pub fn spawn_chart(
         Transform::from_xyz(0.0, JUDGMENT_WORLD_Y, z_order::JUDGMENT_LINE),
     ));
 
-    for event in &loaded.player.chart().data.events {
+    for event in loaded.player.chart().data().events() {
         match &event.kind {
             EventKind::Bar => {
                 commands.spawn((
@@ -183,19 +183,17 @@ pub fn spawn_chart(
                     Visibility::Hidden,
                 ));
             }
-            EventKind::Note {
-                side, lane, kind, ..
-            } => {
-                let Some(track) = layout.index_of(*side, *lane) else {
+            EventKind::Note(note) => {
+                let Some(track) = layout.index_of(note.side, note.lane) else {
                     continue;
                 };
                 spawn_note(
                     commands,
                     event.tick(),
                     track,
-                    *kind,
+                    note.kind,
                     layout.width(track),
-                    *lane,
+                    note.lane,
                 );
             }
             _ => {}
@@ -352,7 +350,7 @@ pub fn update_notes(
     for (note, mut transform, mut sprite, mut visibility) in &mut query {
         let note_scroll = player.scroll_position_at(note.tick);
         let scroll_diff = note_scroll - current_scroll;
-        let y = event_screen_y(viewport.height, scroll_diff, player.spacing_at(note.tick));
+        let y = event_screen_y(viewport.height, scroll_diff, spacing_at(player, note.tick));
         let screen = ScreenPos::new(origin_x + session.layout.center_x(note.track), y);
 
         match note.part {
@@ -371,7 +369,7 @@ pub fn update_notes(
                 };
                 let end_scroll = player.scroll_position_at(end_tick);
                 let end_diff = end_scroll - current_scroll;
-                let end_y = event_screen_y(viewport.height, end_diff, player.spacing_at(end_tick));
+                let end_y = event_screen_y(viewport.height, end_diff, spacing_at(player, end_tick));
                 let top = y.min(end_y);
                 let bottom = y.max(end_y);
                 let (center, height) = body_geometry(top, bottom);
@@ -389,6 +387,27 @@ pub fn update_notes(
     }
 }
 
+/// 0.0.1 起 `Player::spacing_at(tick)` 移除，等价换算为时间域查询。
+fn spacing_at(player: &bmsrs::player::Player<(), crate::chart::PreviewEvent>, tick: u64) -> f64 {
+    player.spacing_at_time(player.tick_to_duration(tick))
+}
+
+/// 0.0.1 起 `Player::visible_tick_range` 移除，按原语义在时间域重建。
+fn visible_tick_range(
+    player: &bmsrs::player::Player<(), crate::chart::PreviewEvent>,
+    reaction: std::time::Duration,
+    lookahead: std::time::Duration,
+) -> (u64, u64) {
+    let now = player.tick_to_duration(player.current_tick());
+    let start = now
+        .checked_sub(reaction)
+        .unwrap_or(std::time::Duration::ZERO);
+    let end = now
+        .checked_add(lookahead)
+        .unwrap_or(std::time::Duration::MAX);
+    (player.duration_to_tick(start), player.duration_to_tick(end))
+}
+
 /// 更新小节线。
 pub fn update_bars(
     session: Res<Session>,
@@ -401,14 +420,15 @@ pub fn update_bars(
     let player = &loaded.player;
     let current_tick = player.current_tick();
     let current_scroll = player.scroll_position_at(current_tick);
-    let (start_tick, _) = player.visible_tick_range(
+    let (start_tick, _) = visible_tick_range(
+        player,
         std::time::Duration::from_millis(REACTION_MS),
         std::time::Duration::from_millis(LOOKAHEAD_MS),
     );
 
     for (bar, mut transform, mut visibility) in &mut query {
         let diff = player.scroll_position_at(bar.tick) - current_scroll;
-        let y = event_screen_y(viewport.height, diff, player.spacing_at(bar.tick));
+        let y = event_screen_y(viewport.height, diff, spacing_at(player, bar.tick));
         transform.translation.y = viewport.height / 2.0 - y;
         *visibility = if bar.tick >= start_tick && y_visible(y, viewport.height, 20.0) {
             Visibility::Visible

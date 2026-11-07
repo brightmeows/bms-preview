@@ -8,18 +8,19 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use bmsrs::bms::ErrorStrategy;
-use bmsrs::bms::parser::Bms;
-use bmsrs::bms::processor::BmsProcessor;
-use bmsrs::bms::processor::custom_event::BmsCustomEvent;
-use bmsrs::bms::processor::layout::{Bme, BmsLayout, Pms, PmsBme, PmsLayout};
-use bmsrs::bms::source::Document;
-use bmsrs::bmson::def::{Bmson, DetectedVersion};
-use bmsrs::bmson::processor::BmsonProcessor;
 use bmsrs::chart::{
-    AudioAsset, BgaLayer, BgaResource, Chart, CustomEvent, Event, EventKind, Lane, NoteKind,
-    NoteSide,
+    AudioAsset, BgaLayer, BgaResource, BgaResourceKind, Chart, CustomEvent, Event, EventKind, Lane,
+    NoteKind, NoteSide,
 };
 use bmsrs::player::Player;
+use bmsrs::raw::bmson_model::{Bmson, DetectedVersion};
+use bmsrs::raw::bmson_processor::BmsonProcessor;
+use bmsrs::raw::model::Bms;
+use bmsrs::raw::parser::BmsParser;
+use bmsrs::raw::processor::BmsProcessor;
+use bmsrs::raw::processor::custom_event::BmsCustomEvent;
+use bmsrs::raw::processor::layout::{Bme, BmsLayout, Pms, PmsBme, PmsLayout};
+use bmsrs::raw::source::Document;
 use clap::ValueEnum;
 use thiserror::Error;
 
@@ -157,19 +158,19 @@ impl LoadedChart {
     /// 谱面标题。
     #[must_use]
     pub fn title(&self) -> &str {
-        &self.player.chart().song.title
+        &self.player.chart().song().title
     }
 
     /// 艺术家。
     #[must_use]
     pub fn artist(&self) -> &str {
-        &self.player.chart().song.artist
+        &self.player.chart().song().artist
     }
 
     /// 谱面名称。
     #[must_use]
     pub fn chart_name(&self) -> &str {
-        &self.player.chart().chart.chart_name
+        &self.player.chart().chart_info().chart_name
     }
 
     /// 总时长。
@@ -206,9 +207,6 @@ pub enum LoadError {
     /// BMSON 处理失败。
     #[error("BMSON 处理失败: {0}")]
     BmsonProcess(String),
-    /// 播放器校验失败。
-    #[error("谱面校验失败: {0}")]
-    Player(String),
 }
 
 /// 确定性 `#RANDOM` 随机源。
@@ -254,17 +252,36 @@ pub fn load_chart(path: &Path, options: LoadOptions) -> Result<LoadedChart, Load
         .parent()
         .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
 
-    let (chart, mode, mut warnings) = match extension.as_str() {
+    let (chart, mode, mut warnings, video_from_model) = match extension.as_str() {
         "bms" | "bme" | "bml" | "pms" => load_bms(path, options, &extension)?,
-        "bmson" => load_bmson(path)?,
+        "bmson" => {
+            let (chart, mode, warnings) = load_bmson(path)?;
+            (chart, mode, warnings, None)
+        }
         other => return Err(LoadError::UnsupportedExtension(other.to_owned())),
     };
 
     let stats = chart_stats(&chart);
-    let video_asset = chart.chart.video.clone();
-    let bga_resources = chart.chart.bga_resources.clone();
-    let audio_assets = chart.data.audio_assets.clone();
-    let player = Player::new(chart).map_err(|e| LoadError::Player(e.to_string()))?;
+    // 模型侧车（#VIDEOFILE/#MOVIE）优先；否则扫描 BGA 资源声明里
+    // 按扩展名推断为视频的条目。扫描路径不携带循环/帧率/延迟参数，
+    // 回退到播放器默认值。
+    let video_asset = video_from_model.or_else(|| {
+        chart
+            .chart_info()
+            .bga_resources
+            .iter()
+            .find_map(|resource| {
+                (resource.kind() == BgaResourceKind::Video).then(|| VideoSource {
+                    path: resource.path.clone(),
+                    loop_playback: true,
+                    fps: None,
+                    delay_frames: None,
+                })
+            })
+    });
+    let bga_resources = chart.chart_info().bga_resources.clone();
+    let audio_assets = chart.data().audio_assets().to_vec();
+    let player = Player::new(chart);
 
     let video = video_asset.and_then(|asset| {
         match resolve_path(
@@ -303,14 +320,22 @@ fn load_bms(
     path: &Path,
     options: LoadOptions,
     extension: &str,
-) -> Result<(Chart<(), PreviewEvent>, ModeKind, Vec<String>), LoadError> {
+) -> Result<
+    (
+        Chart<(), PreviewEvent>,
+        ModeKind,
+        Vec<String>,
+        Option<VideoSource>,
+    ),
+    LoadError,
+> {
     let bytes = std::fs::read(path).map_err(|source| LoadError::Io {
         path: path.to_path_buf(),
         source,
     })?;
     let document = Document::from_bytes(bytes);
     let mut rng = SeedRng::new(options.seed);
-    let parsed = Bms::from_document(
+    let parsed = BmsParser::parse_document(
         &document,
         |max| rng.next_bounded(max),
         ErrorStrategy::CollectAll,
@@ -323,6 +348,9 @@ fn load_bms(
         .map(|warning| format!("解析警告: {:?}", warning.kind))
         .collect();
     let bms = parsed.bms;
+    // 0.0.1 起处理器不再产出视频资产：#VIDEOFILE/#MOVIE 及参数留在
+    // 模型 visual 侧车，按旧语义在此重建。
+    let video_asset = video_source_from_model(&bms);
 
     let mode = match options.mode {
         ModeChoice::Auto if extension == "pms" => ModeKind::Pms,
@@ -349,7 +377,7 @@ fn load_bms(
             .map(|warning| format!("处理警告: {warning:?}")),
     );
 
-    let (chart, ignored) = map_bms_chart(chart);
+    let (chart, ignored) = map_bms_chart(chart)?;
     if !ignored.is_empty() {
         warnings.push(format!(
             "忽略自定义事件: {}",
@@ -357,7 +385,7 @@ fn load_bms(
         ));
     }
 
-    Ok((chart, mode, warnings))
+    Ok((chart, mode, warnings, video_asset))
 }
 
 fn process_bms<L: BmsLayout>(
@@ -365,45 +393,47 @@ fn process_bms<L: BmsLayout>(
 ) -> Result<
     (
         Chart<(), BmsCustomEvent>,
-        Vec<bmsrs::bms::processor::ProcessWarning>,
+        Vec<bmsrs::raw::processor::ProcessWarning>,
     ),
     LoadError,
 > {
     BmsProcessor::process::<L>(bms)
-        .map(|processed| (processed.chart, processed.warnings))
+        .map(|processed| (processed.value.chart, processed.warnings))
         .map_err(|e| LoadError::BmsProcess(e.to_string()))
 }
 
 fn map_bms_chart(
     chart: Chart<(), BmsCustomEvent>,
-) -> (Chart<(), PreviewEvent>, BTreeSet<&'static str>) {
+) -> Result<(Chart<(), PreviewEvent>, BTreeSet<&'static str>), LoadError> {
     let mut ignored = BTreeSet::new();
-    let chart = chart.filter_map_events(|event| {
-        let tick = event.tick();
-        match event.kind {
-            EventKind::Custom(custom) => match &custom {
-                BmsCustomEvent::BgaOpacity { layer, opacity } => Some(Event::new(
-                    tick,
-                    EventKind::Custom(PreviewEvent::BgaOpacity {
-                        layer: *layer,
-                        opacity: *opacity,
-                    }),
-                )),
-                BmsCustomEvent::VideoSeek { position } => Some(Event::new(
-                    tick,
-                    EventKind::Custom(PreviewEvent::VideoSeek {
-                        position_ms: *position,
-                    }),
-                )),
-                other => {
-                    ignored.insert(custom_event_name(other));
-                    None
-                }
-            },
-            kind => Some(Event::new(tick, kind.map_custom(|_| PreviewEvent::Other))),
-        }
-    });
-    (chart, ignored)
+    let chart = chart
+        .try_filter_map_events(|event| {
+            let tick = event.tick();
+            match event.kind {
+                EventKind::Custom(custom) => match &custom {
+                    BmsCustomEvent::BgaOpacity { layer, opacity } => Some(Event::new(
+                        tick,
+                        EventKind::Custom(PreviewEvent::BgaOpacity {
+                            layer: *layer,
+                            opacity: *opacity,
+                        }),
+                    )),
+                    BmsCustomEvent::VideoSeek { position } => Some(Event::new(
+                        tick,
+                        EventKind::Custom(PreviewEvent::VideoSeek {
+                            position_ms: *position,
+                        }),
+                    )),
+                    other => {
+                        ignored.insert(custom_event_name(other));
+                        None
+                    }
+                },
+                kind => Some(Event::new(tick, kind.map_custom(|_| PreviewEvent::Other))),
+            }
+        })
+        .map_err(|e| LoadError::BmsProcess(e.to_string()))?;
+    Ok((chart, ignored))
 }
 
 const fn custom_event_name(event: &BmsCustomEvent) -> &'static str {
@@ -412,7 +442,6 @@ const fn custom_event_name(event: &BmsCustomEvent) -> &'static str {
         BmsCustomEvent::BgaArgb { .. } => "BgaArgb",
         BmsCustomEvent::BgaKeyBound { .. } => "BgaKeyBound",
         BmsCustomEvent::TextDisplay { .. } => "TextDisplay",
-        BmsCustomEvent::JudgeOverride { .. } => "JudgeOverride",
         BmsCustomEvent::OptionChange { .. } => "OptionChange",
         BmsCustomEvent::BgmVolume { .. } => "BgmVolume",
         BmsCustomEvent::KeyVolume { .. } => "KeyVolume",
@@ -428,22 +457,22 @@ fn load_bmson(path: &Path) -> Result<(Chart<(), PreviewEvent>, ModeKind, Vec<Str
     let version =
         DetectedVersion::detect(&content).map_err(|e| LoadError::BmsonParse(e.to_string()))?;
 
-    let bmson: Bmson<'_> = match version {
+    let bmson: Bmson = match version {
         DetectedVersion::V2 => {
             serde_json::from_str(&content).map_err(|e| LoadError::BmsonParse(e.to_string()))?
         }
         DetectedVersion::V1 => {
-            let v1: bmsrs::bmson::def::v1::Bmson<'_> =
+            let v1: bmsrs::raw::bmson_model::v1::Bmson =
                 serde_json::from_str(&content).map_err(|e| LoadError::BmsonParse(e.to_string()))?;
-            let root: Bmson<'_> = v1.into();
+            let root: Bmson = v1.into();
             root
         }
         DetectedVersion::V0 => {
-            let v0: bmsrs::bmson::def::v0::Bmson<'_> =
+            let v0: bmsrs::raw::bmson_model::v0::Bmson =
                 serde_json::from_str(&content).map_err(|e| LoadError::BmsonParse(e.to_string()))?;
-            let root: Bmson<'_> =
+            let root: Bmson =
                 v0.try_into()
-                    .map_err(|e: bmsrs::bmson::def::v0::TryFromV0Error| {
+                    .map_err(|e: bmsrs::raw::bmson_model::v0::TryFromV0Error| {
                         LoadError::BmsonParse(e.to_string())
                     })?;
             root
@@ -452,23 +481,26 @@ fn load_bmson(path: &Path) -> Result<(Chart<(), PreviewEvent>, ModeKind, Vec<Str
 
     let processed = BmsonProcessor::process_default(&bmson)
         .map_err(|e| LoadError::BmsonProcess(e.to_string()))?;
-    let chart: Chart<(), PreviewEvent> = processed.chart.filter_map_events(|event| {
-        let tick = event.tick();
-        let kind: EventKind<(), PreviewEvent> = event
-            .kind
-            .map_ext(|_ext| ())
-            .map_custom(|_| PreviewEvent::Other);
-        Some(Event::new(tick, kind))
-    });
+    let chart: Chart<(), PreviewEvent> = processed
+        .value
+        .try_filter_map_events(|event| {
+            let tick = event.tick();
+            let kind: EventKind<(), PreviewEvent> = event
+                .kind
+                .map_ext(|_ext| ())
+                .map_custom(|_| PreviewEvent::Other);
+            Some(Event::new(tick, kind))
+        })
+        .map_err(|e| LoadError::BmsonProcess(e.to_string()))?;
 
     Ok((chart, ModeKind::Bmson, Vec::new()))
 }
 
 fn chart_stats<T: bmsrs::chart::NoteExt, C: CustomEvent>(chart: &Chart<T, C>) -> ChartStats {
     let mut stats = ChartStats::default();
-    for event in &chart.data.events {
+    for event in chart.data().events() {
         match &event.kind {
-            EventKind::Note { kind, .. } => match kind {
+            EventKind::Note(note) => match &note.kind {
                 NoteKind::Normal => {
                     stats.normal += 1;
                     stats.playable += 1;
@@ -528,6 +560,35 @@ fn normalize_separators(path: &Path) -> PathBuf {
     PathBuf::from(text)
 }
 
+/// 0.0.1 起处理器不再产出视频资产，按旧语义从模型 visual 侧车重建。
+///
+/// `#VIDEOFILE`（循环）优先于 `#MOVIE`（单次）。
+#[must_use]
+fn video_source_from_model(bms: &Bms) -> Option<VideoSource> {
+    let visual = &bms.visual;
+    let (path, loop_playback) = if let Some(file) = &visual.video_file {
+        (PathBuf::from(file), true)
+    } else {
+        let movie = visual.movie.as_ref()?;
+        (PathBuf::from(movie), false)
+    };
+    Some(VideoSource {
+        path,
+        loop_playback,
+        fps: visual.video_fps,
+        delay_frames: visual.video_dly.map(video_delay_frames),
+    })
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "video delay params fit in u32"
+)]
+#[expect(clippy::cast_sign_loss, reason = "clamped to non-negative before cast")]
+fn video_delay_frames(delay: f64) -> u32 {
+    delay.max(0.0).round() as u32
+}
+
 fn extension_candidates(path: &Path, extensions: &[&str]) -> Vec<PathBuf> {
     let mut candidates = vec![path.to_path_buf()];
     for extension in extensions {
@@ -577,7 +638,7 @@ fn resolve_case_insensitive(base: &Path, relative: &Path) -> Option<PathBuf> {
 #[must_use]
 pub fn note_position(kind: &EventKind<(), PreviewEvent>) -> Option<(NoteSide, Lane)> {
     match kind {
-        EventKind::Note { side, lane, .. } => Some((*side, *lane)),
+        EventKind::Note(note) => Some((note.side, note.lane)),
         _ => None,
     }
 }
