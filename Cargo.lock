@@ -1855,26 +1855,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bms-analysis"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
-dependencies = [
- "bms-syntax",
- "bms-values",
-]
-
-[[package]]
-name = "bms-parser"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
-dependencies = [
- "bms-source",
- "bms-syntax",
- "bms-values",
- "thiserror 2.0.21",
-]
-
-[[package]]
 name = "bms-preview"
 version = "0.1.0"
 dependencies = [
@@ -1893,48 +1873,112 @@ dependencies = [
 ]
 
 [[package]]
-name = "bms-processor"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7249cb5dd9157ece68259e68c14bfb898cb2925b95e548f6b31fa9d4308b2416"
 dependencies = [
- "bms-parser",
+ "bmsrs-bms-analysis",
+ "bmsrs-bms-model",
+ "bmsrs-bms-parser",
+ "bmsrs-bms-processor",
+ "bmsrs-bms-source",
+ "bmsrs-bms-syntax",
+ "bmsrs-bms-values",
+ "bmsrs-bms-writer",
+ "bmsrs-bmson-model",
+ "bmsrs-bmson-processor",
  "bmsrs-chart",
+ "bmsrs-pipeline",
+ "bmsrs-player",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 
 [[package]]
-name = "bms-source"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bms-analysis"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfef6f43021cb8cc36a19902a523c51cfb43c894bbb880f46b61c7c25947bf0f"
+dependencies = [
+ "bmsrs-bms-syntax",
+ "bmsrs-bms-values",
+]
+
+[[package]]
+name = "bmsrs-bms-model"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d266a17c94335b0621d6f43d7ac8a37966a413101405d797c0b1003079e7c54"
+dependencies = [
+ "bmsrs-bms-values",
+ "bmsrs-pipeline",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "bmsrs-bms-parser"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ce93f6393a8b0c629f6071a6a0f273628831bfe5195290e3f1556216417acbd"
+dependencies = [
+ "bmsrs-bms-model",
+ "bmsrs-bms-source",
+ "bmsrs-bms-syntax",
+ "bmsrs-bms-values",
+ "bmsrs-pipeline",
+]
+
+[[package]]
+name = "bmsrs-bms-processor"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5f47cdfffd0b6cf9000747efe8a02559dadaeb419563680eadc7ee16ff6ff0f"
+dependencies = [
+ "bmsrs-bms-model",
+ "bmsrs-chart",
+ "bmsrs-pipeline",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "bmsrs-bms-source"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6350d2a0c95bdba7dc2030b80a4f30c394d0601edf5f9b2b1bdb397109c0212"
 dependencies = [
  "encoding_rs",
  "thiserror 2.0.21",
 ]
 
 [[package]]
-name = "bms-syntax"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bms-syntax"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c943044c6c0546f1804896558dd35e074b72544026d8c83e9334ed056d15bd45"
 dependencies = [
- "bms-source",
+ "bmsrs-bms-source",
  "rowan",
  "thiserror 2.0.21",
 ]
 
 [[package]]
-name = "bms-values"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bms-values"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "829b9e10f667e78ea3b2627fa8340b15db9a4b8ee7958516bb082d0a8296ee88"
 dependencies = [
- "bms-values-derive",
+ "bmsrs-bms-values-derive",
+ "bmsrs-pipeline",
  "derive_more",
  "thiserror 2.0.21",
 ]
 
 [[package]]
-name = "bms-values-derive"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bms-values-derive"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "207c56f0dc16944d3b5aa64cffb49c7b56e64c87f76fd9f039a38e72fdda2924"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1942,17 +1986,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "bms-writer"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bms-writer"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53d812ede4307ee1122b2886a2901e13a432e7cfb913b35bbc201149d57c8ccf"
 dependencies = [
- "bms-parser",
+ "bmsrs-bms-model",
 ]
 
 [[package]]
-name = "bmson-def"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bmson-model"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6304d46136b12866d4980bf3d4a0f555e38f234ac0c4d16fc5b39c5e7e27b664"
 dependencies = [
  "derive_more",
  "serde",
@@ -1961,43 +2007,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "bmson-processor"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+name = "bmsrs-bmson-processor"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dde93e53529deaf16a766b11374e8e3d846d89a313ba7e38841f25aef50ee7c"
 dependencies = [
- "bmson-def",
+ "bmsrs-bmson-model",
  "bmsrs-chart",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "bmsrs"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
-dependencies = [
- "bms-analysis",
- "bms-parser",
- "bms-processor",
- "bms-source",
- "bms-syntax",
- "bms-values",
- "bms-writer",
- "bmson-def",
- "bmson-processor",
- "bmsrs-chart",
- "bmsrs-player",
+ "bmsrs-pipeline",
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "bmsrs-chart"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "584a6f8bbfcd8afb30d228043af0c61db833b196da30f6e86208c26fd73224e0"
+
+[[package]]
+name = "bmsrs-pipeline"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52f804cb55d2eeca57fa51c62852fc1f109eb6eeb2384207cdaec00e4ead8238"
 
 [[package]]
 name = "bmsrs-player"
-version = "0.1.0"
-source = "git+https://github.com/brightmeows/bmsrs?rev=da1d9f46b84955312ea42bb291b0edddab29e3df#da1d9f46b84955312ea42bb291b0edddab29e3df"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5251aa94b5083c5ba60737ba298afb35da036e6a73158f62a345f76b4ebf774"
 dependencies = [
  "bmsrs-chart",
 ]

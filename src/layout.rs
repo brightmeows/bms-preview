@@ -94,7 +94,7 @@ impl TrackLayout {
 #[must_use]
 pub fn infer_layout(chart: &Chart<(), PreviewEvent>) -> TrackLayout {
     let mut positions: Vec<(NoteSide, Lane)> = Vec::new();
-    for event in &chart.data.events {
+    for event in chart.data().events() {
         if let Some(position) = note_position(&event.kind)
             && !positions.contains(&position)
         {

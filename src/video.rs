@@ -124,8 +124,8 @@ impl VideoState {
 
         let seek_points = player
             .chart()
-            .data
-            .events
+            .data()
+            .events()
             .iter()
             .filter_map(|event| match &event.kind {
                 EventKind::Custom(PreviewEvent::VideoSeek { position_ms }) => {
