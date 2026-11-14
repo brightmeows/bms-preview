@@ -171,7 +171,7 @@ jobs:
             libasound2-dev libdbus-1-dev libavcodec-dev libavdevice-dev libavformat-dev libavfilter-dev \
             libavutil-dev libswresample-dev libswscale-dev libwayland-dev libxkbcommon-dev \
             libudev-dev pkg-config
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@1.120.0
       - name: Get Rust version
         run: echo "RUST_VERSION=$(rustc --version | cut -d' ' -f2)" >> "$GITHUB_ENV"
       - name: Restore cargo registry
