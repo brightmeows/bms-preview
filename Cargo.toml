@@ -51,7 +51,7 @@ bevy = { version = "0.20.0", default-features = false, features = [
     "x11",
 ] }
 clap = { version = "4", features = ["derive"] }
-firewheel = { version = "0.14.0", features = ["scheduled_events"] }
+firewheel = { version = "0.15.0", features = ["scheduled_events"] }
 image = { version = "0.25.2", default-features = false, features = ["bmp", "jpeg", "png"] }
 ndarray = "=0.17.2"
 rfd = "0.18.0"
